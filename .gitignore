@@ -2,3 +2,4 @@
 *.log
 logs/
 logs/**/*.log
+__pycache__
