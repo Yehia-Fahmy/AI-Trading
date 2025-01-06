@@ -17,12 +17,12 @@ ALPACA_CREDS = {
     "PAPER": True
 }
 
-start_date = datetime(2023, 1, 1)
+start_date = datetime(2020, 1, 1)
 end_date = datetime(2024, 1, 1)
-paramerters = {"symbol": "SPY", "cash_at_risk": 1}
+paramerters = {"symbol": "SPY", "cash_at_risk": 0.5}
 
 class MLTrader(Strategy):
-    def initialize(self, symbol:str="SPY", cash_at_risk:float=1):
+    def initialize(self, symbol:str="SPY", cash_at_risk:float=0.5):
         self.symbol = symbol
         self.sleeptime = "24H"
         self.last_trade = None
@@ -41,21 +41,26 @@ class MLTrader(Strategy):
         return today.strftime("%Y-%m-%d"), three_days_ago.strftime("%Y-%m-%d")
 
 
-    def get_news(self):
+    def get_sentiment(self):
         today, three_days_ago = self.get_dates()
         news = self.api.get_news(symbol=self.symbol, start=three_days_ago, end=today)
         news = [ev.__dict__["_raw"]["headline"] for ev in news]
         # print("=====================================")
         # print(f"Returning news from {three_days_ago} to {today}")
         # print(news)
-        return news
+        probability, sentiment = estimate_sentiment(news)
+        return probability, sentiment
     
     def on_trading_iteration(self):
         cash, last_price, quantity = self.position_sizing()
-        # news = self.get_news()
+        probability, sentiment = self.get_sentiment()
+        print(f"Probability: {probability}, Sentiment: {sentiment}")
 
-        if cash > quantity * last_price and quantity > 0:
-            order = self.create_order(
+        if cash > last_price: 
+            if sentiment == "positive" and probability > .999: 
+                if self.last_trade == "sell": 
+                    self.sell_all() 
+                order = self.create_order(
                     self.symbol, 
                     quantity, 
                     "buy", 
@@ -63,8 +68,22 @@ class MLTrader(Strategy):
                     take_profit_price=last_price*1.20, 
                     stop_loss_price=last_price*.95
                 )
-            self.submit_order(order)
-            self.last_trade = "buy"
+                self.submit_order(order) 
+                self.last_trade = "buy"
+            elif sentiment == "negative" and probability > .999: 
+                if self.last_trade == "buy": 
+                    self.sell_all() 
+                order = self.create_order(
+                    self.symbol, 
+                    quantity, 
+                    "sell", 
+                    type="bracket", 
+                    take_profit_price=last_price*.8, 
+                    stop_loss_price=last_price*1.05
+                )
+                self.submit_order(order) 
+                self.last_trade = "sell"
+
 
 broker = Alpaca(ALPACA_CREDS)
 strategy = MLTrader(name='mlstrat', broker=broker, parameters=paramerters)
