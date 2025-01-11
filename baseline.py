@@ -19,7 +19,7 @@ ALPACA_CREDS = {
 
 start_date = datetime(2020, 1, 1)
 end_date = datetime(2024, 1, 1)
-paramerters = {"symbol": "SPY", "cash_at_risk": 0.5}
+paramerters = {"symbol": "SPY", "cash_at_risk": 0.75}
 
 class MLTrader(Strategy):
     def initialize(self, symbol:str="SPY", cash_at_risk:float=0.5):
